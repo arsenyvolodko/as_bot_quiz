@@ -2,7 +2,7 @@ from collections import defaultdict
 from operator import or_
 
 from aiogram import Dispatcher, Router, types
-from aiogram.enums import ParseMode
+from aiogram.enums import ParseMode, ChatMemberStatus
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, FSInputFile
@@ -39,6 +39,25 @@ async def handle_continue_from_start_state_query(call: CallbackQuery, state: FSM
 @router.callback_query(F.data == ButtonsStorage.CONTINUE_FROM_SUBSCRIBE.callback)
 async def handle_continue_from_subscribe_state_query(call: CallbackQuery, state: FSMContext):
     await state.clear()
+    try:
+        member = await call.bot.get_chat_member(chat_id=consts.JUNIOR_TEAM_CHAT_ID, user_id=call.from_user.id)
+        is_member = (
+                member.status in
+                {
+                    ChatMemberStatus.MEMBER,
+                    ChatMemberStatus.ADMINISTRATOR,
+                    ChatMemberStatus.CREATOR
+                }
+        ) if member else False
+
+        if not is_member:
+            await call.answer(
+                consts.NOT_SUBSCRIBED_TEXT,
+                show_alert=True
+            )
+            return
+    except Exception as e:
+        pass
     await call.message.edit_text(
         consts.AFTER_SUBSCRIBE_TEXT, reply_markup=get_continue_from_subscribe_keyboard()
     )
@@ -74,7 +93,6 @@ async def handle_continue_after_subscribe_state_query(call: CallbackQuery, state
     )
 )
 async def handle_get_back(call: CallbackQuery, callback_data: QuestionSubmissionFactory, state: FSMContext):
-
     questions_data = await state.get_data()
     if callback_data.question_num == 9 and 'media_msg' in questions_data:
         await delete_media(questions_data)
